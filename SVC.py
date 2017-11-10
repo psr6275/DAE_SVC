@@ -11,6 +11,7 @@ from cvxopt import solvers
 from sklearn.metrics.pairwise import euclidean_distances
 from numpy import matlib as ml
 from scipy.optimize import *
+from sklearn.neighbors import NearestNeighbors as NNs
 
 ##Structure
 """
@@ -172,7 +173,7 @@ def load_data(data_path):
 
 def svdd_normalize(input_data,svdd_model):
     Xin = svdd_model.input
-    [dim, n] = Xin.shape
+    [dim, n] = input_data.shape
     mean_by_col = np.mean(Xin, axis=1).reshape(dim, 1)
     stds_by_col = np.std(Xin, axis=1).reshape(dim, 1)
     means = np.tile(mean_by_col, (1, n))
@@ -827,12 +828,23 @@ class labeling:
         else:
             self.hierarchicalLabelTSVC()
             print(self.cluster_label)
-
+    def fmsc_induction(self,test_input):
+        """
+        induct the cluster labels of test input! after fmsc model is trained
+        test_input is the number of data x the dimensions
+        """
+        n_input = svdd_normalize(test_input.T,self.supportmodel)
+        n_input = n_input.T
+        ## Find nearest center to test input
+        nbrs = NNs(n_neighbors=1,algorithm='ball_tree').fit(self.centers)
+        _,clst = nbrs.kneighbors(n_input)
+        cluster_label = self.matchBallIndex(clst,self.fmscmodel['ball_cluster_labels'],self.centers,self.locals).flatten()
+        return n_input, cluster_label
 
     def fmsc(self):
-        self.clstmodel = {}
-        self.clstmodel['options'] = self.options
-        self.clstmodel['support_model'] = self.supportmodel
+        self.fmscmodel = {}
+        self.fmscmodel['options'] = self.options
+        self.fmscmodel['support_model'] = self.supportmodel
 
         #Partitioning Data into Small Ball
         self.R1 = self.options['R1']
@@ -844,7 +856,7 @@ class labeling:
         #self.clstmodel['local'] = unique_locals.T
         self.locals = unique_locals
         self.findAdjMatrix(unique_locals.T)
-
+        
 
         csm = cg.connected_components(self.adjacent_matrix)
         local_clusters_assignments = csm[1]
@@ -853,6 +865,7 @@ class labeling:
 
 
         cluster_labels = local_clusters_assignments[match_locals]
+        self.fmscmodel['ball_cluster_labels'] =cluster_labels
         self.local_ass = local_clusters_assignments
 
         self.cluster_label = self.matchBallIndex(self.clst, cluster_labels, self.centers, unique_locals).flatten()
@@ -897,7 +910,7 @@ class labeling:
         local_val = []
         arrival = np.zeros([N, 1])
 
-        all_locals = centers
+        all_locals = np.array(centers,copy=True)
         converge = 0
         iter = 1
 
