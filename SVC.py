@@ -171,7 +171,7 @@ def load_data(data_path):
     return input
 
 def svdd_normalize(input_data,svdd_model):
-    Xin = self.input
+    Xin = svdd_model.input
     [dim, n] = Xin.shape
     mean_by_col = np.mean(Xin, axis=1).reshape(dim, 1)
     stds_by_col = np.std(Xin, axis=1).reshape(dim, 1)
