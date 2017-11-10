@@ -833,6 +833,7 @@ class labeling:
         induct the cluster labels of test input! after fmsc model is trained
         test_input is the number of data x the dimensions
         """
+        assert self.labelingmethod == 'fmsc'
         n_input = svdd_normalize(test_input.T,self.supportmodel)
         n_input = n_input.T
         ## Find nearest center to test input
