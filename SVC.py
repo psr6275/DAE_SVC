@@ -170,6 +170,17 @@ def load_data(data_path):
         input = data['train_input'].T
     return input
 
+def svdd_normalize(input_data,svdd_model):
+    Xin = self.input
+    [dim, n] = Xin.shape
+    mean_by_col = np.mean(Xin, axis=1).reshape(dim, 1)
+    stds_by_col = np.std(Xin, axis=1).reshape(dim, 1)
+    means = np.tile(mean_by_col, (1, n))
+    stds = np.tile(stds_by_col, (1, n))
+    X_normal = (input_data - means) / stds
+    return X_normal 
+
+
 class supportmodel:
     def __init__(self, input=None, support='SVDD', hyperparams=None):
         self.input = input  ### input.shape = [dim, N_sample]
@@ -767,7 +778,7 @@ class labeling:
             self.out_ts = tmp_ts[ind[0]]
             local_clusters_assignments = local_clusters_assignments[:, ind[0]]
             self.local_ass = local_clusters_assignments
-            self.cluster_labels = self.local_ass[self.match_local]
+            self.cluster_label = self.local_ass[self.match_local]
             print(self.cluster_labels)
 
     def tmsc(self):
