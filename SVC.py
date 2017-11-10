@@ -762,7 +762,7 @@ class labeling:
                 self.out_ts = tmp_ts[m]
                 # % cluster assignment into entire data points
                 self.local_ass = assignment
-                self.cluster_labels = self.local_ass[self.match_local].T
+                self.cluster_label = self.local_ass[self.match_local].T
                 flag = 1
                 break
 
@@ -779,7 +779,7 @@ class labeling:
             local_clusters_assignments = local_clusters_assignments[:, ind[0]]
             self.local_ass = local_clusters_assignments
             self.cluster_label = self.local_ass[self.match_local]
-            print(self.cluster_labels)
+            print(self.cluster_label)
 
     def tmsc(self):
         fHierarchical = self.options['hierarchical']
@@ -822,11 +822,11 @@ class labeling:
             self.ts['cuttingLevel'] = self.supportmodel.R
 
             # % cluster assignment into entire data points
-            self.cluster_labels = self.local_clusters_assignments[match_local].T  ###transpose
-            print(self.cluster_labels)
+            self.cluster_label = self.local_clusters_assignments[match_local].T  ###transpose
+            print(self.cluster_label)
         else:
             self.hierarchicalLabelTSVC()
-            print(self.cluster_labels)
+            print(self.cluster_label)
 
 
     def fmsc(self):
