@@ -841,7 +841,8 @@ class labeling:
 
         [all_locals, unique_locals, match_locals] = self.labelFSVC(self.centers, self.supportmodel, self.R2)
 
-        self.clstmodel['local'] = unique_locals.T
+        #self.clstmodel['local'] = unique_locals.T
+        self.locals = unique_locals
         self.findAdjMatrix(unique_locals.T)
 
 
@@ -852,13 +853,13 @@ class labeling:
 
 
         cluster_labels = local_clusters_assignments[match_locals]
-        self.clstmodel['local_clusters_assignments'] = local_clusters_assignments
+        self.local_ass = local_clusters_assignments
 
-        self.clstmodel['cluster_labels'] = self.matchBallIndex(self.clst, cluster_labels, self.centers, unique_locals)
-        self.clstmodel['centers'] = self.centers
-        self.clstmodel['match_locals'] = match_locals
+        self.cluster_label = self.matchBallIndex(self.clst, cluster_labels, self.centers, unique_locals).flatten()
+        #self.clstmodel['centers'] = self.centers
+        self.match_local = match_locals
 
-        print(self.clstmodel['cluster_labels'])
+        #print(self.clstmodel['cluster_labels'])
 
 
     def partition(self, X, r):
