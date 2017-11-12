@@ -12,6 +12,7 @@ from sklearn.metrics.pairwise import euclidean_distances
 from numpy import matlib as ml
 from scipy.optimize import *
 from sklearn.neighbors import NearestNeighbors as NNs
+import pickle
 
 ##Structure
 """
@@ -180,33 +181,58 @@ def svdd_normalize(input_data,svdd_model):
     stds = np.tile(stds_by_col, (1, n))
     X_normal = (input_data - means) / stds
     return X_normal 
+def svdd_denormalize(input_data,svdd_model):
+    Xin = svdd_model.input
+    [dim,n] = input_data.shape
+    mean_by_col = np.mean(Xin, axis=1).reshape(dim, 1)
+    stds_by_col = np.std(Xin, axis=1).reshape(dim, 1)
+    means = np.tile(mean_by_col, (1, n))
+    stds = np.tile(stds_by_col, (1, n))
+    X_denormal = (input_data * stds)+means
+    return X_denormal
+
 
 
 class supportmodel:
     def __init__(self, input=None, support='SVDD', hyperparams=None):
         self.input = input  ### input.shape = [dim, N_sample]
-        assert type(self.input) is np.ndarray, 'ERROR: input type must be numpy.ndarray'
+        if input is not None:
+            assert type(input) is np.ndarray, 'ERROR: input type must be numpy.ndarray'
         self.support = support  ### 'SVDD' or 'GP'
         assert self.support == 'SVDD' or self.support == 'GP' or self.support == 'pseudo', 'ERROR: Support must be \'SVDD\', or \'GP\', or \'psuedo\''
-        if self.support == 'SVDD':
-            if hyperparams == None:
-                hyperparams = {'ker': 'rbf', 'arg': 1, 'solver': 'imdm', 'C': 1}
-            self.svdd_normalize()
-            self.svdd_params = hyperparams
-            self.svdd()
-        elif self.support == 'GP':
-            if hyperparams == None:
-                hyperparams = [100*np.ones((input.shape[0],1)), 1, 10]
-            self.gp_normalize()
-            self.gp_params = hyperparams
-            assert self.gp_params[0].shape[0] == self.input.shape[0], "ERROR: invalid gp_params shape"
-            self.gp()
-        elif self.support == 'pseudo':
-            if hyperparams == None:
-                hyperparams = {'ker': 'rbf', 'arg': 1, 'solver': 'imdm', 'C':1} #####lsy: other params??
-            self.svdd_normalize() #####lsy: pseudo_normalize()??
-            self.pseudo_params = hyperparams
-            self.pseudo()
+        if input is not None:
+            if self.support == 'SVDD':
+                if hyperparams == None:
+                    hyperparams = {'ker': 'rbf', 'arg': 1, 'solver': 'imdm', 'C': 1}
+                self.svdd_normalize()
+                self.svdd_params = hyperparams
+                self.svdd()
+            elif self.support == 'GP':
+                if hyperparams == None:
+                    hyperparams = [100*np.ones((input.shape[0],1)), 1, 10]
+                self.gp_normalize()
+                self.gp_params = hyperparams
+                assert self.gp_params[0].shape[0] == self.input.shape[0], "ERROR: invalid gp_params shape"
+                self.gp()
+            elif self.support == 'pseudo':
+                if hyperparams == None:
+                    hyperparams = {'ker': 'rbf', 'arg': 1, 'solver': 'imdm', 'C':1} #####lsy: other params??
+                self.svdd_normalize() #####lsy: pseudo_normalize()??
+                self.pseudo_params = hyperparams
+                self.pseudo()
+    def save(self,save_path = None):
+        assert save_path is not None
+        f = open(save_path,'wb')
+        pickle.dump(self,f)
+        f.close()
+        self.save_path = save_path
+
+    def load(self,load_path = None):
+        assert load_path is not None
+        f = open(load_path,'rb')
+        self = pickle.load(f)
+        f.close()
+        self.load_path = load_path
 
     def gp_normalize(self):  ##my_normalize2
         # % input [dim x num_data]
@@ -430,15 +456,28 @@ class labeling:
         self.supportmodel = supportmodel
         self.labelingmethod = labelingmethod
         self.options = options
-        print('----------------------------------------------')
-        print("Step 2 : Labeling by the method " + self.labelingmethod + "...")
-        start_time = time.time()
-        self.run()
-        self.labeling_time = time.time() - start_time
-        print('-------------------')
-        print("Labeling Completed!")
-        print("Time for labeling is : ", self.labeling_time, " sec!")
-        print("-------------------------------------------------")
+        if supportmodel is not None:
+            print('----------------------------------------------')
+            print("Step 2 : Labeling by the method " + self.labelingmethod + "...")
+            start_time = time.time()
+            self.run()
+            self.labeling_time = time.time() - start_time
+            print('-------------------')
+            print("Labeling Completed!")
+            print("Time for labeling is : ", self.labeling_time, " sec!")
+            print("-------------------------------------------------")
+    def save(self,save_path = None):
+        assert save_path is not None
+        f = open(save_path,'wb')
+        pickle.dump(self,f)
+        f.close()
+        self.save_path = save_path
+    def load(self,load_path = None):
+        assert load_path is not None
+        f = open(load_path,'rb')
+        self = pickle.load(f)
+        f.close()
+        self.load_path = load_path
 
     def run(self):
         if self.labelingmethod == 'CG-SC':
@@ -828,14 +867,17 @@ class labeling:
         else:
             self.hierarchicalLabelTSVC()
             print(self.cluster_label)
-    def fmsc_induction(self,test_input):
+    def fmsc_induction(self,test_input,normalize = True):
         """
         induct the cluster labels of test input! after fmsc model is trained
         test_input is the number of data x the dimensions
         """
-        assert self.labelingmethod == 'fmsc'
-        n_input = svdd_normalize(test_input.T,self.supportmodel)
-        n_input = n_input.T
+        assert self.labelingmethod == 'F-MSC'
+        if normalize:
+            n_input = svdd_normalize(test_input.T,self.supportmodel)
+            n_input = n_input.T
+        else:
+            n_input = test_input
         ## Find nearest center to test input
         nbrs = NNs(n_neighbors=1,algorithm='ball_tree').fit(self.centers)
         _,clst = nbrs.kneighbors(n_input)
