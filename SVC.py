@@ -5,6 +5,7 @@ import sklearn.metrics.pairwise as kernels
 import numpy.linalg as la
 from scipy.linalg import inv
 from scipy.sparse import csgraph as cg
+from scipy.special import comb
 from IPython import embed
 from cvxopt import matrix
 from cvxopt import solvers
@@ -48,6 +49,60 @@ my_R_GP2 // f, g, H
 fsolve_R
 fsolve_R_GP
 """
+def cal_ARI(c1,c2):
+    """
+    calculates Rand Indices to compare two partitions
+    type for c1 and c2 is numpy array tuple or list, i.e. one dimensional shape
+    """
+    c1 = np.array(c1)
+    c2 = np.array(c2)
+    C = contingency(c1,c2) #obtain contingency matrix
+    n = np.sum(np.sum(C))
+    nis = np.sum(np.square(np.sum(C,axis=1)))
+    njs = np.sum(np.square(np.sum(C,axis=0)))
+    #t1 =comb(n,2) 
+    t1 = (n*(n-1))/2
+    t2 = np.sum(np.square(C))
+    t3 = 0.5*(nis+njs)
+
+    nc = (n*(np.square(n)+1)-(n+1)*(nis+njs)+2*(nis*njs)/n)/(2*(n-1))
+    A = t1+t2-t3
+    D = -t2+t3
+    if t1 ==nc:
+        AR=0
+    else:
+        AR = (A-nc)/(t1-nc) # AR is ARI!
+    RI = A/t1 #Rand 1971: Probability of agreement
+    MI = D/t1 #Mirkin 1970: p(disagreement)
+    HI = (A-D)/t1 #Hubert 1977: p(agree)-p(disagree)
+
+    return AR
+
+def contingency(c1,c2):
+    """
+    Calculate contingency matrix!
+    First, we need to remap c1 and c2 as from zero to cluster number -1.
+    """
+    cc1 = np.unique(c1)
+    cc2 = np.unique(c2)
+    cd1 = {}
+    cd2 = {}
+    for i,c in enumerate(cc1):
+        cd1[c] = i
+    for i,c in enumerate(cc2):
+        cd2[c] = i
+    cp1 =np.array([cd1[ii] for ii in c1])
+    cp2 =np.array([cd2[ii] for ii in c2])
+
+    me1 = len(cc1)
+    me2 = len(cc2)
+    Cont = np.zeros((me1,me2))
+    for i in range(len(c1)):
+        Cont[cp1[i],cp2[i]] += 1
+
+    return Cont
+
+
 
 def kradius(X, model):
 
