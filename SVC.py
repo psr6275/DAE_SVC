@@ -112,7 +112,9 @@ def kernel(input1, ker, arg, input2=None):
         return K
 
 def qpssvm(H, f, b, I):
+    H = H.astype(np.double)
     P = matrix(H, tc='d')
+    f = f.astype(np.double)
     q = matrix(f.reshape(f.shape[0], 1), tc='d')
 
     G1 = np.eye(I.shape[0])
@@ -573,7 +575,7 @@ class labeling:
                     res = minimize(fun=my_R1, x0=x0, args=model, method='Nelder-Mead')
                     [temp, val] = [res.x, res.fun]
                 else:
-                    res = minimize(fun=my_R1, x0=x0, args=model, method='trust-ncg')
+                    res = minimize(fun=my_R1, x0=x0, args=model, method='trust-ncg',jac = my_R_grad,hess = my_R_hess)
                     [temp, val] = [res.x, res.fun]
                 N_locals.append(temp)
                 local_val.append(val)
@@ -585,7 +587,7 @@ class labeling:
                     res = minimize(fun=my_R_pseudo, x0=x0, args=model, method='Nelder-Mead')
                     [temp, val] = [res.x, res.fun]
                 else:
-                    res = minimize(fun=my_R_pseudo, x0=x0, args=model, method='trust-ncg')
+                    res = minimize(fun=my_R_pseudo, x0=x0, args=model, method='trust-ncg',jac = my_R_pseudo_grad, hess = my_R_pseudo_Hess)
                     [temp, val] = [res.x, res.fun]
                 N_locals.append(temp)
                 local_val.append(val)
@@ -691,9 +693,9 @@ class labeling:
                         res2 = minimize(fun=my_R1, x0=sep2, args=model, method='Nelder-Mead')
                         [temp2, val] = [res2.x, res2.fun]
                     else:
-                        res1 = minimize(fun=my_R1, x0=sep1, args=model, hess=True)
+                        res1 = minimize(fun=my_R1, x0=sep1, args=model,jac = my_R_grad, hess=my_R_hess)
                         [temp1, val] = [res1.x, res1.fun]
-                        res2 = minimize(fun=my_R1, x0=sep2, args=model, hess=True)
+                        res2 = minimize(fun=my_R1, x0=sep2, args=model,jac = my_R_grad, hess=my_R_hess)
                         [temp2, val] = [res2.x, res2.fun]
                     [dummy, ind1] = [np.min(euclidean_distances(temp1.reshape(1, -1), locals)),
                                      np.argmin(euclidean_distances(temp1.reshape(1, -1), locals))]
@@ -731,9 +733,9 @@ class labeling:
                         res2 = minimize(fun=my_R_pseudo, x0=sep2, args=model, method='Nelder-Mead')
                         [temp2, val] = [res2.x, res2.fun]
                     else:
-                        res1 = minimize(fun=my_R_pseudo, x0=sep1, args=model, hess=True)
+                        res1 = minimize(fun=my_R_pseudo, x0=sep1, args=model,method = 'trust-ncg',jac = my_R_pseudo_grad, hess=my_R_pseudo_Hess)
                         [temp1, val] = [res1.x, res1.fun]
-                        res2 = minimize(fun=my_R_pseudo, x0=sep2, args=model, hess=True)
+                        res2 = minimize(fun=my_R_pseudo, x0=sep2, args=model,method = 'trust-ncg',jac = my_R_pseudo_grad, hess=my_R_pseudo_Hess)
                         [temp2, val] = [res2.x, res2.fun]
                     [dummy, ind1] = [np.min(euclidean_distances(temp1.reshape(1, -1), locals)),
                                      np.argmin(euclidean_distances(temp1.reshape(1, -1), locals))]
@@ -969,7 +971,7 @@ class labeling:
                         res = minimize(fun=my_R1, x0=x0, args=model, method='Nelder-Mead')
                         [temp, val] = [res.x, res.fun]
                     else:
-                        res = minimize(fun=my_R1, x0=x0, args=model, method='trust-ncg')
+                        res = minimize(fun=my_R1, x0=x0, args=model, method='trust-ncg',jac = my_R_grad,hess = my_R_hess)
                         [temp, val] = [res.x, res.fun]
                     all_locals[ind[i]] = temp
                     #local_val[ind[i]] = val
@@ -1000,7 +1002,7 @@ class labeling:
                         res = minimize(fun=my_R_pseudo, x0=x0, args=model, method='Nelder-Mead')
                         [temp, val] = [res.x, res.fun]
                     else:
-                        res = minimize(fun=my_R_pseudo, x0=x0, args=model, method='trust-ncg')
+                        res = minimize(fun=my_R_pseudo, x0=x0, args=model, method='trust-ncg',jac = my_R_pseudo_grad,hess = my_R_pseudo_Hess)
                         [temp, val] = [res.x, res.fun]
                     all_locals[ind[i]] = temp
                     #local_val[ind[i]] = val
@@ -1098,6 +1100,44 @@ class labeling:
 def my_R1(x, model):
     f = kradius(x.reshape(x.shape[0], 1), model)
     return f
+def my_R_grad(x, model):
+    d = x.shape[0]
+    n = model.svdd_model['nsv']
+    f = kradius(x.reshape(x.shape[0], 1), model)
+
+    q = 1 / (2 * model.svdd_model['options']['arg'] * model.svdd_model['options']['arg'])
+    K = kernel(model.svdd_model['sv']['X'], model.svdd_model['options']['ker'], model.svdd_model['options']['arg'],
+               input2=x.reshape(x.shape[0], 1))
+    g = 4 * q * np.dot(model.svdd_model['Alpha'].reshape(model.svdd_model['Alpha'].shape[0], 1).T,
+                       np.multiply(ml.repmat(K, 1, d),
+                                   (ml.repmat(x, n, 1) - model.svdd_model['sv']['X'].T)))
+
+    return g
+
+def my_R_hess(x, model):
+    d = x.shape[0]
+    n = model.svdd_model['nsv']
+    f = kradius(x.reshape(x.shape[0], 1), model)
+
+    q = 1 / (2 * model.svdd_model['options']['arg'] * model.svdd_model['options']['arg'])
+    K = kernel(model.svdd_model['sv']['X'], model.svdd_model['options']['ker'], model.svdd_model['options']['arg'],
+               input2=x.reshape(x.shape[0], 1))
+    g = 4 * q * np.dot(model.svdd_model['Alpha'].reshape(model.svdd_model['Alpha'].shape[0], 1).T,
+                       np.multiply(ml.repmat(K, 1, d),
+                                   (ml.repmat(x, n, 1) - model.svdd_model['sv']['X'].T)))
+
+    const = np.multiply(model.svdd_model['Alpha'], K)
+    H = []
+
+    for i in range(d):
+        H.append(- 8 * q * q * np.sum(np.multiply(np.multiply(ml.repmat(const.T, d, 1), (
+        ml.repmat(x[i], d, n) - ml.repmat(model.svdd_model['sv']['X'][i, :].T, d, 1))), (
+                                                  ml.repmat(x.reshape(x.shape[0], 1), 1, n) -
+                                                  model.svdd_model['sv']['X'])), axis=1).T)
+    H = np.array(H).T
+    H = H + 4 * q * np.eye(d) * np.dot(model.svdd_model['Alpha'].reshape(model.svdd_model['Alpha'].shape[0], 1).T, K)
+    return H
+
 
 def my_R2(x, model):
     d = x.shape[0]
@@ -1189,10 +1229,38 @@ def my_R_pseudo(x, model):
     gamma=0.5 / (arg **2)
 
     f_ = np.dot(pmodel['Alpha'].T, np.expand_dims(np.exp(-gamma*np.sum(((np.tile(x,[pmodel['nsv'],1])-pmodel['sv']['X'].T)**2), 1)),1))
-    #print(np.expand_dims(np.exp(-gamma*np.sum(((np.tile(x,[pmodel['nsv'],1])-pmodel['sv']['X'].T)**2), 1)),1).shape)
-    #[35,1]
     f = -np.log(f_)
     return f
+def my_R_pseudo_grad(x,model):
+    f_=0
+    d=x.shape[0]
+    pmodel=model.pseudo_model
+    arg=model.pseudo_params['arg']
+    gamma=0.5 / (arg **2)
+    f_ = np.dot(pmodel['Alpha'].T, np.expand_dims(np.exp(-gamma*np.sum(((np.tile(x,[pmodel['nsv'],1])-pmodel['sv']['X'].T)**2), 1)),1))
+    f = -np.log(f_)
+    g = np.zeros(d)
+    g = -2*gamma*np.dot(pmodel['Alpha'].T, (np.tile(x,[pmodel['nsv'],1])-pmodel['sv']['X'].T)*np.expand_dims(np.exp(-gamma*np.sum(((np.tile(x,[pmodel['nsv'],1])-pmodel['sv']['X'].T)**2), 1)),1))/f_
+    g = g.flatten()
+    return g
+def my_R_pseudo_Hess(x,model):
+    d=x.shape[0]
+    f_ = 0
+    pmodel=model.pseudo_model
+    arg=model.pseudo_params['arg']
+    gamma=0.5 / (arg **2)
+    f_ = np.dot(pmodel['Alpha'].T, np.expand_dims(np.exp(-gamma*np.sum(((np.tile(x,[pmodel['nsv'],1])-pmodel['sv']['X'].T)**2), 1)),1))
+    if np.abs(f_)<10**-300:
+        f_ = np.array([[10**-300]])
+    f = -np.log(f_)
+    g = np.zeros(d)
+    g = -2*gamma*np.dot(pmodel['Alpha'].T, (np.tile(x,[pmodel['nsv'],1])-pmodel['sv']['X'].T)*np.expand_dims(np.exp(-gamma*np.sum(((np.tile(x,[pmodel['nsv'],1])-pmodel['sv']['X'].T)**2), 1)),1))/f_
+    H = np.zeros([d,d])
+    v = np.dot((np.tile(x,[pmodel['nsv'],1])-pmodel['sv']['X'].T).T, np.diag(np.ravel(pmodel['Alpha'].T*np.exp(-gamma*np.sum(((np.tile(x,[pmodel['nsv'],1])-pmodel['sv']['X'].T)**2), 1)))))
+    w = np.tile(x,[pmodel['nsv'],1])-pmodel['sv']['X'].T
+    H = 4*gamma**2/f_* np.dot(v,  w)
+    H = H + np.diag(-2*gamma*np.ones([d,]))    
+    return H
 
 def my_R2_pseudo(x, model):
     ##### lsy
